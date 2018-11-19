@@ -18,7 +18,15 @@
 
 (defn executor
   "Returns a function that can execute retries for a user-defined request
-  based on `policies`."
+  based on `policies`.
+  `policies` is a map with following keys:
+    :handle    - list of exceptions that can cause a restart. any other exception will be re-thrown
+    :retry     - the number of retries, defaults to 1
+    :wait-secs - number of seconds to wait before each retry
+    :wait-fn   - a function to dynamically compute the seconds to wait based on current response
+                 and wait-secs
+  The user-defined `request-fn` must return `{:ok result}` on success. Any other value will trigger a
+  retry. If all retries are expired, `{:error :no-more-retries}` will be returned."
   [policies]
   (let [handle (:handle policies)
         retry (or (:retry policies) 1)
