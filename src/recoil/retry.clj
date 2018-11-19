@@ -14,7 +14,7 @@
       :author "Vijay Mathew"}
     recoil.retry)
 
-(declare retry-for?)
+(declare retry-for? do-wait)
 
 (defn executor
   "Returns a function that can execute retries for a user-defined request
@@ -22,9 +22,12 @@
   [policies]
   (let [handle (:handle policies)
         retry (or (:retry policies) 1)
+        orig-wait-secs (:wait-secs policies)
+        wait-fn (:wait-fn policies)
         no-retries {:error :no-more-retries}]
     (fn [request-fn]
-      (loop [r retry]
+      (loop [wait-secs orig-wait-secs
+             r retry]
         (let [result (:result
                       (try
                         {:result (request-fn)}
@@ -36,7 +39,10 @@
             result
             (if (zero? r)
               no-retries
-              (recur (dec r)))))))))              
+              (if (or wait-secs wait-fn)
+                (recur (do-wait wait-secs wait-fn result)
+                       (dec r))
+                (recur wait-secs (dec r))))))))))
 
 (defn- retry-for? [ex handle]
   (loop [h handle]
@@ -45,3 +51,11 @@
         true
         (recur (rest h)))
       false)))
+
+(defn- do-wait [wait-secs wait-fn last-result]
+  (let [actual-wait-secs (or wait-secs (wait-fn last-result wait-secs))]
+    (try
+      (do (Thread/sleep (* actual-wait-secs 1000))
+          actual-wait-secs)
+      (catch InterruptedException _
+        actual-wait-secs))))
