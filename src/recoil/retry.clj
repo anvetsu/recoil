@@ -32,17 +32,16 @@
         retry (or (:retry policies) 1)
         orig-wait-secs (:wait-secs policies)
         wait-fn (:wait-fn policies)
-        no-retries {:error :no-more-retries}]
+        no-retries {:status :no-retries}]
     (fn [request-fn]
       (loop [wait-secs orig-wait-secs
              r retry]
-        (let [result (:result
-                      (try
-                        {:result (request-fn)}
-                        (catch Exception ex
-                          (if (retry-for? ex handle)
-                            {:result {:error :handled-exception}}
-                            (throw ex)))))]
+        (let [result (try
+                       (request-fn)
+                       (catch Exception ex
+                         (if (retry-for? ex handle)
+                           {:status :handled-exception}
+                           (throw ex))))]
           (if (:ok result)
             result
             (if (zero? r)
@@ -55,7 +54,7 @@
 (defn- retry-for? [ex handle]
   (loop [h handle]
     (if (seq h)
-      (if (instance? ex (first h))
+      (if (instance? (first h) ex)
         true
         (recur (rest h)))
       false)))
