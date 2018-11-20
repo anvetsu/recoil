@@ -40,7 +40,7 @@
                        (request-fn)
                        (catch Exception ex
                          (if (retry-for? ex handle)
-                           :handled-exception
+                           {:error :handled-exception}
                            (throw ex))))]
           (if (and (map? result) (:ok result))
             result
