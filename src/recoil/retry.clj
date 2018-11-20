@@ -61,7 +61,9 @@
       false)))
 
 (defn- do-wait [wait-secs wait-fn last-result n-retry]
-  (let [actual-wait-secs (or wait-secs (wait-fn last-result wait-secs n-retry))]
+  (let [actual-wait-secs (if wait-fn
+                           (wait-fn last-result wait-secs n-retry)
+                           wait-secs)]
     (try
       (do (Thread/sleep (* actual-wait-secs 1000))
           actual-wait-secs)
