@@ -74,3 +74,11 @@
           (is false))
       (catch TimeoutException ex
         (is true)))))
+
+(deftest test-wait-fn
+  (let [exec (r/executor {:handle [TimeoutException]
+                          :retry 1
+                          :wait-fn (fn [_ _ _] 3)})]
+    (is (= (exec (make-timed-connector 3)) {:ok :connected}))
+    (is (= (exec (make-timed-connector 1)) {:ok :connected}))
+    (is (= (exec (make-timed-connector 5)) no-retries))))
