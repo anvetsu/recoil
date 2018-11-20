@@ -40,14 +40,15 @@
                        (request-fn)
                        (catch Exception ex
                          (if (retry-for? ex handle)
-                           {:error :handled-exception}
+                           {:error :handled-exception
+                            :exception ex}
                            (throw ex))))]
           (if (and (map? result) (:ok result))
             result
             (if (zero? r)
               no-retries
               (if (or wait-secs wait-fn)
-                (recur (do-wait wait-secs wait-fn result)
+                (recur (do-wait wait-secs wait-fn result r)
                        (dec r))
                 (recur wait-secs (dec r))))))))))
 
@@ -59,8 +60,8 @@
         (recur (rest h)))
       false)))
 
-(defn- do-wait [wait-secs wait-fn last-result]
-  (let [actual-wait-secs (or wait-secs (wait-fn last-result wait-secs))]
+(defn- do-wait [wait-secs wait-fn last-result n-retry]
+  (let [actual-wait-secs (or wait-secs (wait-fn last-result wait-secs n-retry))]
     (try
       (do (Thread/sleep (* actual-wait-secs 1000))
           actual-wait-secs)
