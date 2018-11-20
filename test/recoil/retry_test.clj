@@ -1,7 +1,7 @@
 (ns recoil.retry-test
   (:require [recoil.retry :as r])
   (:use clojure.test)
-  (:import [java.util.concurrent TimeoutException]
+  (:import [java.util.concurrent TimeoutException ExecutionException]
            [java.sql SQLException]))
 
 (deftest test-make
@@ -81,4 +81,34 @@
                           :wait-fn (fn [_ _ _] 3)})]
     (is (= (exec (make-timed-connector 3)) {:ok :connected}))
     (is (= (exec (make-timed-connector 1)) {:ok :connected}))
-    (is (= (exec (make-timed-connector 5)) no-retries))))
+    (is (= (exec (make-timed-connector 5)) no-retries)))
+
+  (let [exec (r/executor {:handle [TimeoutException]
+                          :retry 3
+                          :wait-fn (fn [_ wait-secs _]
+                                     (if wait-secs
+                                       (* wait-secs 2) ; exponential back-off
+                                       1))})]
+    (is (= (exec (make-timed-connector 3)) {:ok :connected}))
+    (is (= (exec (make-timed-connector 1)) {:ok :connected}))
+    (is (= (exec (make-timed-connector 5)) {:ok :connected}))
+    (is (= (exec (make-timed-connector 8)) no-retries))))
+
+(deftest test-with-future
+  (let [exec (r/executor {:handle [TimeoutException]
+                          :retry 1
+                          :wait-secs 3})
+        f1 (future (exec (make-timed-connector 3)))
+        f2 (future (exec (make-timed-connector 1)))
+        f3 (future (exec (make-timed-connector 5)))]
+    (is (= @f1 {:ok :connected}))
+    (is (= @f2 {:ok :connected}))
+    (is (= @f3  no-retries)))
+  (let [exec (r/executor {:retry 1
+                          :wait-secs 3})
+        f (future (exec (make-timed-connector 1)))]
+    (try
+      (do @f
+          (is false))
+      (catch ExecutionException ex
+        (is true)))))
