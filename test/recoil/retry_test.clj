@@ -78,6 +78,7 @@
 (deftest test-wait-fn
   (let [exec (r/executor {:handle [TimeoutException]
                           :retry 1
+                          :wait-secs 1 ; should be ignored
                           :wait-fn (fn [_ _ _] 3)})]
     (is (= (exec (make-timed-connector 3)) {:ok :connected}))
     (is (= (exec (make-timed-connector 1)) {:ok :connected}))
