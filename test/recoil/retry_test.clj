@@ -36,11 +36,41 @@
       (catch SQLException ex
         (is true)))))
 
+(def no-retries {:error :no-more-retries})
+
 (deftest test-no-retries
-  (let [no-retries {:error :no-more-retries}]
-    (let [exec (r/executor {:handle [TimeoutException SQLException]
-                            :retry 1})]
-      (is (= (exec (make-db-connector)) no-retries)))
-    (let [exec (r/executor {:handle [TimeoutException SQLException]
-                            :retry 0})]
-      (is (= (exec (make-db-connector)) no-retries)))))
+  (let [exec (r/executor {:handle [TimeoutException SQLException]
+                          :retry 1})]
+    (is (= (exec (make-db-connector)) no-retries)))
+  (let [exec (r/executor {:handle [TimeoutException SQLException]
+                          :retry 0})]
+    (is (= (exec (make-db-connector)) no-retries))))
+
+(defn- make-timed-connector
+  [secs-to-succeed]
+  ;; Simulates a network connection with timeouts.
+  (let [state (atom 0)
+        ems (* 1000 secs-to-succeed)]
+    (fn []
+      (if (= @state 0)
+        (do
+          (reset! state (System/currentTimeMillis))
+          (throw (TimeoutException.)))
+        (if (>= (- (System/currentTimeMillis) @state) ems)
+          {:ok :connected}
+          (throw (TimeoutException.)))))))
+
+(deftest test-wait-secs
+  (let [exec (r/executor {:handle [TimeoutException]
+                          :retry 1
+                          :wait-secs 3})]
+    (is (= (exec (make-timed-connector 3)) {:ok :connected}))
+    (is (= (exec (make-timed-connector 1)) {:ok :connected}))
+    (is (= (exec (make-timed-connector 5)) no-retries)))
+  (let [exec (r/executor {:retry 1
+                          :wait-secs 3})]
+    (try
+      (do (exec (make-timed-connector 1))
+          (is false))
+      (catch TimeoutException ex
+        (is true)))))
