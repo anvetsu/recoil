@@ -37,9 +37,10 @@
         (is true)))))
 
 (deftest test-no-retries
-  (let [exec (r/executor {:handle [TimeoutException SQLException]
-                          :retry 1})]
-    (is (= (exec (make-db-connector)) {:status :no-retries})))
-  (let [exec (r/executor {:handle [TimeoutException SQLException]
-                          :retry 0})]
-    (is (= (exec (make-db-connector)) {:status :no-retries}))))
+  (let [no-retries {:error :no-more-retries}]
+    (let [exec (r/executor {:handle [TimeoutException SQLException]
+                            :retry 1})]
+      (is (= (exec (make-db-connector)) no-retries)))
+    (let [exec (r/executor {:handle [TimeoutException SQLException]
+                            :retry 0})]
+      (is (= (exec (make-db-connector)) no-retries)))))

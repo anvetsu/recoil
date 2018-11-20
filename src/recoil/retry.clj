@@ -32,7 +32,7 @@
         retry (or (:retry policies) 1)
         orig-wait-secs (:wait-secs policies)
         wait-fn (:wait-fn policies)
-        no-retries {:status :no-retries}]
+        no-retries {:error :no-more-retries}]
     (fn [request-fn]
       (loop [wait-secs orig-wait-secs
              r retry]
@@ -40,9 +40,9 @@
                        (request-fn)
                        (catch Exception ex
                          (if (retry-for? ex handle)
-                           {:status :handled-exception}
+                           :handled-exception
                            (throw ex))))]
-          (if (:ok result)
+          (if (and (map? result) (:ok result))
             result
             (if (zero? r)
               no-retries
