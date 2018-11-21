@@ -36,18 +36,20 @@
       (catch SQLException ex
         (is true)))))
 
-(def no-retries {:error :no-more-retries})
+(def no-retries :no-retries-left)
+
+(defn- validate-status [status]
+  (is (= no-retries (:status status))))
 
 (deftest test-no-retries
   (let [exec (r/executor {:handle [TimeoutException SQLException]
                           :retry 1})]
-    (is (= (exec (make-db-connector)) no-retries)))
+    (validate-status (exec (make-db-connector))))
   (let [exec (r/executor {:handle [TimeoutException SQLException]
                           :retry 0})]
-    (is (= (exec (make-db-connector)) no-retries))))
+    (validate-status (exec (make-db-connector)))))
 
-(defn- make-timed-connector
-  [secs-to-succeed]
+(defn- make-timed-connector [secs-to-succeed]
   ;; Simulates a network connection with timeouts.
   (let [state (atom 0)
         ems (* 1000 secs-to-succeed)]
@@ -66,7 +68,7 @@
                           :wait-secs 3})]
     (is (= (exec (make-timed-connector 3)) {:ok :connected}))
     (is (= (exec (make-timed-connector 1)) {:ok :connected}))
-    (is (= (exec (make-timed-connector 5)) no-retries)))
+    (validate-status (exec (make-timed-connector 5))))
   (let [exec (r/executor {:retry 1
                           :wait-secs 3})]
     (try
@@ -82,7 +84,7 @@
                           :wait-fn (fn [_ _ _] 3)})]
     (is (= (exec (make-timed-connector 3)) {:ok :connected}))
     (is (= (exec (make-timed-connector 1)) {:ok :connected}))
-    (is (= (exec (make-timed-connector 5)) no-retries)))
+    (validate-status (exec (make-timed-connector 5))))
 
   (let [exec (r/executor {:handle [TimeoutException]
                           :retry 3
@@ -93,7 +95,7 @@
     (is (= (exec (make-timed-connector 3)) {:ok :connected}))
     (is (= (exec (make-timed-connector 1)) {:ok :connected}))
     (is (= (exec (make-timed-connector 5)) {:ok :connected}))
-    (is (= (exec (make-timed-connector 8)) no-retries))))
+    (validate-status (exec (make-timed-connector 8)))))
 
 (deftest test-with-future
   (let [exec (r/executor {:handle [TimeoutException]
@@ -104,7 +106,7 @@
         f3 (future (exec (make-timed-connector 5)))]
     (is (= @f1 {:ok :connected}))
     (is (= @f2 {:ok :connected}))
-    (is (= @f3  no-retries)))
+    (validate-status @f3))
   (let [exec (r/executor {:retry 1
                           :wait-secs 3})
         f (future (exec (make-timed-connector 1)))]

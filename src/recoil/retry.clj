@@ -14,7 +14,7 @@
       :author "Vijay Mathew"}
     recoil.retry)
 
-(declare retry-for? do-wait)
+(declare retry-for? do-wait handle-no-retries)
 
 (defn executor
   "Returns a function that can execute retries for a user-defined request
@@ -32,7 +32,7 @@
         retry (or (:retry policies) 1)
         orig-wait-secs (:wait-secs policies)
         wait-fn (:wait-fn policies)
-        no-retries {:error :no-more-retries}]
+        no-retries {:status :no-retries-left}]
     (fn [request-fn]
       (loop [wait-secs orig-wait-secs
              r retry]
@@ -46,7 +46,7 @@
           (if (and (map? result) (:ok result))
             result
             (if (zero? r)
-              no-retries
+              (assoc no-retries :result result)
               (if (or wait-secs wait-fn)
                 (recur (do-wait wait-secs wait-fn result r)
                        (dec r))
