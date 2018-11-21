@@ -26,7 +26,8 @@
     :wait-fn   - a function to dynamically compute the seconds to wait based on current response
                  and wait-secs
   The user-defined `request-fn` must return `{:ok result}` on success. Any other value will trigger a
-  retry. If all retries are expired, `{:error :no-more-retries}` will be returned."
+  retry. If all retries are expired, `{:status :no-retries-left :result <result>}` will be returned,
+  where <result> will the return value of the last failed attempt."
   [policies]
   (let [handle (:handle policies)
         retry (or (:retry policies) 1)
