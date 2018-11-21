@@ -21,6 +21,10 @@
                        (throw (SQLException.)))
         :else {:ok :connected}))))
 
+(defn- validate-unhandled-exception [result exec-class]
+  (is (= :unhandled-exception (:error result)))
+  (is (instance? exec-class (:exception result))))
+
 (deftest test-execptions
   (let [exec (r/executor {:handle [TimeoutException SQLException]
                           :retry 3})]
@@ -30,11 +34,9 @@
     (is (= (exec (make-db-connector)) {:ok :connected})))
   (let [exec (r/executor {:handle [TimeoutException]
                           :retry 3})]
-    (try
-      (do (exec (make-db-connector))
-          (is false))
-      (catch SQLException ex
-        (is true)))))
+    (validate-unhandled-exception
+     (exec (make-db-connector))
+     SQLException)))
 
 (def no-retries :no-retries-left)
 
@@ -77,11 +79,9 @@
     (validate-status (exec (make-timed-connector 5))))
   (let [exec (r/executor {:retry 1
                           :wait-secs 3})]
-    (try
-      (do (exec (make-timed-connector 1))
-          (is false))
-      (catch TimeoutException ex
-        (is true)))))
+    (validate-unhandled-exception
+     (exec (make-timed-connector 1))
+     TimeoutException)))
 
 (deftest test-wait-fn
   (let [exec (r/executor {:handle [TimeoutException]
@@ -116,8 +116,6 @@
   (let [exec (r/executor {:retry 1
                           :wait-secs 3})
         f (future (exec (make-timed-connector 1)))]
-    (try
-      (do @f
-          (is false))
-      (catch ExecutionException ex
-        (is true)))))
+    (validate-unhandled-exception
+      @f
+      TimeoutException)))

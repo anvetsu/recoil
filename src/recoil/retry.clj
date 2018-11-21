@@ -43,8 +43,10 @@
                          (if (retry-for? ex handle)
                            {:error :handled-exception
                             :exception ex}
-                           (throw ex))))]
-          (if (and (map? result) (:ok result))
+                           {:error :unhandled-exception
+                            :exception ex})))]
+          (if (or (get result :ok)
+                  (= :unhandled-exception (get result :error)))
             result
             (if (zero? r)
               (assoc no-retries :result result)
