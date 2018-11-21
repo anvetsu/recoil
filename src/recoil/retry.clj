@@ -14,7 +14,7 @@
       :author "Vijay Mathew"}
     recoil.retry)
 
-(declare retry-for? do-wait handle-no-retries)
+(declare retry-for? do-wait)
 
 (defn executor
   "Returns a function that can execute retries for a user-defined request
