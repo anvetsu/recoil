@@ -38,16 +38,22 @@
 
 (def no-retries :no-retries-left)
 
-(defn- validate-status [status]
-  (is (= no-retries (:status status))))
+(defn- validate-status
+  ([status contains-error?]
+   (is (= no-retries (:status status)))
+   (when contains-error?
+     (is (= :handled-exception (:error (:result status))))
+     (is (:exception (:result status)))))
+  ([status]
+   (validate-status status false)))
 
 (deftest test-no-retries
   (let [exec (r/executor {:handle [TimeoutException SQLException]
                           :retry 1})]
-    (validate-status (exec (make-db-connector))))
+    (validate-status (exec (make-db-connector)) true))
   (let [exec (r/executor {:handle [TimeoutException SQLException]
                           :retry 0})]
-    (validate-status (exec (make-db-connector)))))
+    (validate-status (exec (make-db-connector)) true)))
 
 (defn- make-timed-connector [secs-to-succeed]
   ;; Simulates a network connection with timeouts.
@@ -84,7 +90,7 @@
                           :wait-fn (fn [_ _ _] 3)})]
     (is (= (exec (make-timed-connector 3)) {:ok :connected}))
     (is (= (exec (make-timed-connector 1)) {:ok :connected}))
-    (validate-status (exec (make-timed-connector 5))))
+    (validate-status (exec (make-timed-connector 5)) true))
 
   (let [exec (r/executor {:handle [TimeoutException]
                           :retry 3
