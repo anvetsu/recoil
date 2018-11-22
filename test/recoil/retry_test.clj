@@ -119,3 +119,22 @@
     (validate-unhandled-exception
       @f
       TimeoutException)))
+
+(defn- make-values-tester [tries]
+  (let [state (atom 0)]
+    (fn []
+      (if (< @state tries)
+        (let [resp {:error @state}]
+          (reset! state (inc @state))
+          resp)
+        {:ok :done}))))
+
+(deftest test-values
+  (let [tries 3]
+    (defn callback [last-result wait-secs n-tries]
+      (when-let [n (:error last-result)]
+        (is (= tries (+ n n-tries))))
+      1)
+    (let [exec (r/executor {:wait-fn callback
+                            :retry tries})]
+      (exec (make-values-tester tries)))))
