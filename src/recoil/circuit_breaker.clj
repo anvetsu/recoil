@@ -14,7 +14,7 @@
       :author "Vijay Mathew <vijay@anvetsu.com>"}
     recoil.circuit-breaker
   (:require [recoil.util :as ru])
-  (:import [java.util.concurrent.TimeUnit NANOSECONDS]))
+  (:import [java.util.concurrent TimeUnit]))
 
 (declare invoke invoke-open)
 
@@ -32,7 +32,7 @@
   [policies cb-name]
   (let [state {:state (atom :closed)
                :exceptions 0
-               :closed-ts 0L}
+               :closed-ts 0}
         info (assoc policies :name cb-name)]
     (fn [request-fn]
       (case (:state @state)
@@ -61,14 +61,14 @@
             (log cb-info @state)
             result))
       (do (when close?
-            (swap! state assoc :state :closed :exceptions 0 :closed-ts 0L)
+            (swap! state assoc :state :closed :exceptions 0 :closed-ts 0)
             (log cb-info @state))
           result))))
 
 (defn- invoke-open [request-fn cb-info state]
   (let [current-state @state
         cts (System/nanoTime)]
-    (if (>= (NANOSECONDS/toSeconds (- cts (:closed-ts current-state))) (:wait-secs cb-info))
+    (if (>= (.toSeconds TimeUnit/NANOSECONDS (- cts (:closed-ts current-state))) (:wait-secs cb-info))
       (do (swap! state assoc :state :half-open)
           (log cb-info @state)
           (invoke request-fn cb-info state true))
