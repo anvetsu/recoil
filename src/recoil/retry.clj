@@ -11,14 +11,14 @@
 ;; This can improve the stability of the application.
 
 (ns ^{:doc "The Retry pattern"
-      :author "Vijay Mathew"}
-    recoil.retry)
+      :author "Vijay Mathew <vijay@anvetsu.com>"}
+    recoil.retry
+  (:require [recoil.util :as ru]))
 
-(declare retry-for? do-wait)
+(declare do-wait)
 
 (defn executor
-  "Returns a function that can execute retries for a user-defined request
-  based on `policies`.
+  "Returns a function that execute retries for a user-defined request based on some `policies`.
   `policies` is a map with following keys:
     :handle    - list of exceptions that can cause a restart. any other exception will be re-thrown
     :retry     - the number of retries, defaults to 1
@@ -40,7 +40,7 @@
         (let [result (try
                        (request-fn)
                        (catch Exception ex
-                         (if (retry-for? ex handle)
+                         (if (ru/retry-for? ex handle)
                            {:error :handled-exception
                             :exception ex}
                            {:error :unhandled-exception
@@ -54,14 +54,6 @@
                 (recur (do-wait wait-secs wait-fn result r)
                        (dec r))
                 (recur wait-secs (dec r))))))))))
-
-(defn- retry-for? [ex handle]
-  (loop [h handle]
-    (if (seq h)
-      (if (instance? (first h) ex)
-        true
-        (recur (rest h)))
-      false)))
 
 (defn- do-wait [wait-secs wait-fn last-result n-retry]
   (let [actual-wait-secs (if wait-fn
