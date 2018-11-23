@@ -16,3 +16,15 @@
       (if (instance? (first h) ex)
         true
         (recur (rest h))))))
+
+(defn try-call [request-fn handle source]
+  (try
+    (request-fn)
+    (catch Exception ex
+      (if (retry-for? ex handle)
+        {:error :handled-exception
+         :source source
+         :exception ex}
+        {:error :unhandled-exception
+         :source source
+         :exception ex}))))

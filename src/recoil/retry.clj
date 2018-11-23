@@ -37,14 +37,7 @@
     (fn [request-fn]
       (loop [wait-secs orig-wait-secs
              r retry]
-        (let [result (try
-                       (request-fn)
-                       (catch Exception ex
-                         (if (ru/retry-for? ex handle)
-                           {:error :handled-exception
-                            :exception ex}
-                           {:error :unhandled-exception
-                            :exception ex})))]
+        (let [result (ru/try-call request-fn handle :retry)]
           (if (or (get result :ok)
                   (= :unhandled-exception (get result :error)))
             result
