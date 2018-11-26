@@ -48,7 +48,10 @@
 (defn- invoke [request-fn cb-info state close?]
   ;; Another thread might have opened the circuit breaker by now,
   ;; we choose to ignore it and proceed instead of serializing
-  ;; and slowing down the request.
+  ;; and slowing down the request. Even if this request succeeds,
+  ;; the implementation makes sure that the circuit breaker stays open.
+  ;; This choice makes sure requests complete fast and the network
+  ;; resource is given enough time to stabilize.
   (let [current-state @state
         result (ru/try-call request-fn (:handle cb-info) :circuit-breaker)]        
     (if (and (= (:error result) :handled-exception)
