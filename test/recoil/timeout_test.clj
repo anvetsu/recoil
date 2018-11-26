@@ -27,6 +27,13 @@
   (let [db-conn (make-db-connector 3000 true false (atom nil))
         result (t/execute db-conn 1500)]
     (is (= :unhandled-exception (:error result)))
+    (is (= :timeout (:source result))))
+  (let [db-conn (make-db-connector 3000 false true (atom nil))
+        eventual-connect (fn [r]
+                           (is (= :unhandled-exception (:error r)))
+                           (is (= :timeout (:source r))))
+        result (t/execute db-conn 1500 eventual-connect)]
+    (is (= :timeout (:error result)))
     (is (= :timeout (:source result)))))
 
     
