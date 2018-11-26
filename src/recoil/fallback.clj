@@ -24,16 +24,16 @@
        result
 
        (= (:error result) :handled-exception)
-       (if fallback
-         (handle-fallback fallback result)
+       (if on-fallback
+         (handle-fallback on-fallback result)
          result)
 
        :else result)))
   ([action on-fallback]
-   (execute action [Exception])))
+   (execute action on-fallback [Exception])))
 
-(defn- handle-fallback [fallback result]
-  (let [result (u/try-call fallback [] :fallback)]
+(defn- handle-fallback [on-fallback result]
+  (let [result (u/try-call #(on-fallback result) [] :fallback)]
     (if (:ok result)
       (assoc result :fallback true)
       result)))
