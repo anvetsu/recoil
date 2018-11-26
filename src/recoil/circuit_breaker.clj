@@ -25,20 +25,22 @@
   The circuit-breaker is configured by the `policies` parameter.
   `policies` is a map with following keys:
     :handle              - list of exceptions that can cause the circuit-breaker to open
-    :exceptions-allowed  - the number of exceptions allowed before moving to the open state
+    :window-size         - the number of exceptions allowed before moving to the open state
     :wait-secs           - number of seconds for the circuit-breaker to remain in the open state
     :logger              - a single-arity function that will receive the current state change of the circuit-breaker
   The `cb-name` parameter will be useful for identifying the circuit breaker, especially in the logs."
-  [policies cb-name]
-  (let [state {:state (atom :closed)
-               :exceptions 0
-               :closed-ts 0}
-        info (assoc policies :name cb-name)]
-    (fn [request-fn]
-      (case (:state @state)
-        :closed (invoke request-fn info state false)
-        :open (invoke-open request-fn info state)
-        :half-open cb-open-error)))) ; another thread is using the half-open mode.
+  ([policies cb-name]
+   (let [state (atom {:state :closed
+                      :exceptions 0
+                      :closed-ts 0})
+         info (assoc policies :name cb-name)]
+     (fn [request-fn]
+       (case (:state @state)
+         :closed (invoke request-fn info state false)
+         :open (invoke-open request-fn info state)
+         :half-open cb-open-error)))) ; another thread is using the half-open mode.
+  ([policies]
+   (executor policies (.toString (java.util.UUID/randomUUID)))))
 
 (defn- log [cb-info current-state]
   (when-let [logger (:logger cb-info)]
@@ -56,7 +58,7 @@
         result (ru/try-call request-fn (:handle cb-info) :circuit-breaker)]        
     (if (and (= (:error result) :handled-exception)
              (= (:source result) :circuit-breaker))
-      (if (> (:exceptions current-state) (:exceptions-allowed cb-info))
+      (if (> (:exceptions current-state) (:window-size cb-info))
         (do (swap! state assoc :state :open :closed-ts (System/nanoTime))
             (log cb-info @state)
             cb-open-error)
