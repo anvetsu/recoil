@@ -25,6 +25,17 @@
     (is (= :timeout (:source result)))
     (Thread/sleep 2000))); wait for eventual-connect to execute.
 
+(deftest test-cancellation
+  (let [cancel-token (atom false)
+        db-conn (make-db-connector 3000 false false cancel-token)
+        eventual-connect (fn [r]
+                           (is (= r {:error :canceled})))
+        result (t/execute db-conn 1500 eventual-connect)]
+    (is (= :timeout (:error result)))
+    (is (= :timeout (:source result)))
+    (reset! cancel-token true)
+    (Thread/sleep 2000))); wait for eventual-connect to execute.
+
 (deftest test-exceptions
   (let [db-conn (make-db-connector 3000 true false)
         result (t/execute db-conn 1500)]
