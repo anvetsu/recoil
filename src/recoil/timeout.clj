@@ -13,18 +13,13 @@
 (ns ^{:doc "A Timeout policy implementation"
       :author "Vijay Mathew <vijay@anvetsu.com>"}
     recoil.timeout
-  (:require [clojure.core.async :as a]))
+  (:require [recoil.util :as u]
+            [clojure.core.async :as a]))
 
 (defn execute
   ([action timeout-ms on-eventual-complete]
-   (let [c (a/chan)
-         f (fn []
-             (try
-               (action)
-               (catch Exception ex
-                 {:error :handled-exception
-                  :exception ex})))]
-     (a/go (a/>! c (f)))
+   (let [c (a/chan)]
+     (a/go (a/>! c (u/try-call action nil :timeout)))
      (let [[val ch] (a/alts!! [c (a/timeout timeout-ms)])]
        (if val
          val
@@ -32,6 +27,6 @@
            (when on-eventual-complete
              (a/go (on-eventual-complete (a/<! c))))
            {:error :timeout
-            :source :recoil.timeout})))))
+            :source :timeout})))))
   ([action timeout-ms]
    (execute action timeout-ms nil)))
