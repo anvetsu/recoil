@@ -10,18 +10,27 @@
   [window-size]
   (let [c (atom 0)]
     (fn []
-      (if (< @c window-size)
+      (if (<= @c (inc window-size))
         (do (reset! c (inc @c))
             (throw (TimeoutException.)))
         {:ok :connected}))))
 
 (deftest test-open
   (let [wsz 3
+        wsecs 3
         exec (cb/executor {:handle [TimeoutException]
-                           :wait-secs 2
+                           :wait-secs wsecs
                            :window-size wsz})
         action (make-db-connector wsz)]
-    (doseq [_ (range wsz)]
+    (doseq [_ (range (inc wsz))]
       (let [r (exec action)]
         (is (= (:error r) :handled-exception))
-        (is (= (:source r) :circuit-breaker))))))
+        (is (= (:source r) :circuit-breaker))))
+    (let [r (exec action)]
+      (is (= (:error r) :circuit-breaker-open))
+      (is (= (:source r) :circuit-breaker)))
+    (let [r (exec action)]
+      (is (= (:error r) :circuit-breaker-open))
+      (is (= (:source r) :circuit-breaker)))
+    (Thread/sleep (* 1000 wsecs))
+    (is (= (:ok (exec action)) :connected))))

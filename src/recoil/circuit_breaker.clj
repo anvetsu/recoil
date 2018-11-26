@@ -38,7 +38,7 @@
        (case (:state @state)
          :closed (invoke request-fn info state false)
          :open (invoke-open request-fn info state)
-         :half-open cb-open-error)))) ; another thread is using the half-open mode.
+         :half-open cb-open-error)))) ; a limited number of threads are already in the half-open mode.
   ([policies]
    (executor policies (.toString (java.util.UUID/randomUUID)))))
 
@@ -48,14 +48,13 @@
              :state current-state})))
 
 (defn- invoke [request-fn cb-info state close?]
-  ;; Another thread might have opened the circuit breaker by now,
-  ;; we choose to ignore it and proceed instead of serializing
-  ;; and slowing down the request. Even if this request succeeds,
-  ;; the implementation makes sure that the circuit breaker stays open.
-  ;; This choice makes sure requests complete fast and the network
+  ;; Another thread might have already decided to open the circuit breaker by now,
+  ;; we choose to ignore it and proceed instead of serializing and slowing down the request.
+  ;; Even if this request succeeds, the implementation makes sure that the circuit breaker
+  ;; stays open. This design choice makes sure requests complete fast and the network
   ;; resource is given enough time to stabilize.
   (let [current-state @state
-        result (ru/try-call request-fn (:handle cb-info) :circuit-breaker)]        
+        result (ru/try-call request-fn (:handle cb-info) :circuit-breaker)]
     (if (and (= (:error result) :handled-exception)
              (= (:source result) :circuit-breaker))
       (if (> (:exceptions current-state) (:window-size cb-info))
@@ -65,15 +64,16 @@
         (do (swap! state assoc :exceptions (inc (:exceptions current-state)))
             (log cb-info @state)
             result))
-      (do (when close?
-            (swap! state assoc :state :closed :exceptions 0 :closed-ts 0)
-            (log cb-info @state))
+      (do (if close?
+            (do (swap! state assoc :state :closed :exceptions 0 :closed-ts 0)
+                (log cb-info @state))
+            (do (swap! state assoc :exceptions 0)
+                (log cb-info @state)))
           result))))
 
 (defn- invoke-open [request-fn cb-info state]
-  (let [current-state @state
-        cts (System/nanoTime)]
-    (if (>= (.toSeconds TimeUnit/NANOSECONDS (- cts (:closed-ts current-state))) (:wait-secs cb-info))
+  (let [cts (System/nanoTime)]
+    (if (>= (.toSeconds TimeUnit/NANOSECONDS (- cts (:closed-ts @state))) (:wait-secs cb-info))
       (do (swap! state assoc :state :half-open)
           (log cb-info @state)
           (invoke request-fn cb-info state true))
