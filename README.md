@@ -143,3 +143,21 @@ such eventually acquired resources and deal with them appropriately. This is ach
 ```
 
 ### Fallbacks
+
+Sometimes it is useful to perform an alternate action in place of a failed operation.
+For instance, the alternate action for a failed database read maybe to lookup a stale value from a local cache.
+The Fallback pattern allows you to express such fallback scenarios:
+
+```clojure
+(use '[recoil.fallback :as f])
+
+(let [result (f/execute (fn [] (db/lookup :id 1000))
+                        (fn [last-r] ;; `last-r` is the value returned by the original db/lookup call.
+                          (cache/lookup :id 1000)))]
+  (if (:ok result)
+    (if (:fallback result)
+      (do (log/info "stale data")
+          (:ok result))
+      (:ok result))
+    (log/error "lookup failed")))
+```
