@@ -101,7 +101,7 @@ go through for later debugging purposes.
 
 ```clojure
 (defn cb-logger [cb-info]
- (log/debug (str "circuit breaker " (:name cb-info) " changed to state: " (:state cb-info))))
+  (log/debug (str "circuit breaker " (:name cb-info) " changed to state: " (:state cb-info))))
 
 (cb/executor {:handle [TimeoutException]
               :wait-secs 5
@@ -109,8 +109,37 @@ go through for later debugging purposes.
 	      :logger cb-logger})
 ```
 
-
-
 ### Timeouts
+
+A responsive application should avoid blocking threads by waiting forever on a resource.
+The recoil Timeout pattern makes it simple to add timeouts to blocking operations.
+For instance, this is how we will add a timeout of 5 seconds to the `connect-to-db` function call:
+
+```clojure
+(use '[recoil.timeout :as t])
+
+(let [result (t/execute connect-to-db 5000)]
+  (cond
+   (:ok result) :connected
+   (= :timeout (:error result)) :failed-with-timeout
+   :else :other-error))
+```
+Note that the timeout is specified in milliseconds.
+
+Sometimes it is possible to issue a cancellation on the low-level resource handle passed to
+functions like `connect-to-db`. But may services like databases do not support a reliable
+cancellation mechanism. In such cases, the operation may still continue to execute in a background thread
+and eventually return a resource. If not disposed off properly resources returned by timed-out operations
+may lead to resource leaks in the system. The recoil implementation of timeout allows you to get access to
+such eventually acquired resources and deal with them appropriately. This is achieved by passing an single arity
+"resource handler" function as a third argument to `t/execute`.
+
+```clojure
+(defn eventual-connect [result]
+  (when (:ok result)
+    (db/close (:connection result))))
+
+(t/execute connect-to-db 5000 eventual-connect)
+```
 
 ### Fallbacks
