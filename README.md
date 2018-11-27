@@ -95,9 +95,9 @@ the duration of `:wait-secs`. After that, it changes to a `half-open` state, whe
 If those succeed by returning an `{ok ...}` result, the circuit breaker will go to the normal `closed` state. Otherwise, it will
 go back to the `open` state and repeat the cycle.
 
-As a single circuit breaker will be shared between multiple operations on a single resource, it may become a performance bottleneck.
-To avoid this, the recoil implementation has avoided the use of long-held global locks. This means, the circuit breaker only guarantees
-that eventually `open`. In other words, a few calls may go through the circuit breaker even after the state machine has decided to
+As a single circuit breaker will be shared between multiple operations on a resource, it may become a performance bottleneck.
+To get around this, the recoil implementation has avoided the use of long-held global locks. This means, the circuit breaker only guarantees
+that will eventually `open`. In other words, a few calls may go through the circuit breaker even after the state machine has decided to
 move to the `open` state.
 
 A circuit breaker can be configured with a "logger" function. This is useful for capturing the state changes that a circuit breaker will
@@ -131,7 +131,7 @@ For instance, this is how we will add a timeout of 5 seconds to the `connect-to-
 Note that the timeout is specified in milliseconds.
 
 Sometimes it is possible to issue a cancellation on the low-level resource handle passed to
-functions like `connect-to-db`. But may services like databases do not support a reliable
+functions like `connect-to-db`. But many services like databases do not support a reliable
 cancellation mechanism. In such cases, the operation may still continue to execute in a background thread
 and eventually return a resource. If not disposed off properly resources returned by timed-out operations
 may lead to resource leaks in the system. The recoil implementation of timeout allows you to get access to
