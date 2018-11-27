@@ -53,7 +53,7 @@ The following program shows how to do this:
 Here the function passed to `:wait-fn` will be called to compute the duration between retries.
 It is passed the last result from the operation, the current value of `:wait-secs` and the number of retries
 remaining as arguments. In this particular case, it is assumed that the operation is able to report the number
-of seconds of downtime for the remote service and this value is use to dynamically calculate a wait duration.
+of seconds of downtime for the remote service and this value is used to dynamically calculate a wait duration.
 
 A simpler strategy of exponential back-off can be implemented as follows:
 
@@ -88,11 +88,11 @@ breaker as shown below:
     :else :some-other-error))
 ```
 
-The policy for the circuit breaker means to open the circuit breaker if it encounters 5 consecutive `TimeoutException`s.
-Once the circuit breaker is open, no more operations are allowed through it until it is closed again. During that time,
-the executor will return `{:error :circuit-breaker-open}`. Once open, the circuit breaker will remain in that state for
-the duration of `:wait-secs`. After that, it changes to a half-open state, where a limited number of operations will be allowed.
-If those succeed by returns an `{ok ...}` result, the circuit breaker will go to the normal closed state. Otherwise, it will
+The policy for the circuit breaker will `open` the circuit breaker if it encounters 5 consecutive `TimeoutException`s.
+Once the circuit breaker is `open`, no more operations are allowed through it until it is `closed` again. During that time,
+the executor will return `{:error :circuit-breaker-open}`. Once `open`, the circuit breaker will remain in that state for
+the duration of `:wait-secs`. After that, it changes to a `half-open` state, where a limited number of operations will be allowed.
+If those succeed by returning an `{ok ...}` result, the circuit breaker will go to the normal `closed` state. Otherwise, it will
 go back to the `open` state and repeat the cycle.
 
 As a single circuit breaker will be shared between multiple operations on a single resource, it may become a performance bottleneck.
