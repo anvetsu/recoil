@@ -15,9 +15,11 @@ a `SQLException`. The `TimeoutException` is usually caused by a temporary networ
 is retried after a few seconds. So `connect-to-db` can be called under a retry policy as:
 
 ```clojure
-(let [exec (recoil.retry/executor {:handle [TimeoutException]
-                                   :retry 3
-				   :wait-secs 5})]
+(use '[recoil.retry :as r])
+
+(let [exec (r/executor {:handle [TimeoutException]
+                        :retry 3
+                        :wait-secs 5})]
   (exec (connect-to-db)))
 ```
 
@@ -40,8 +42,8 @@ The following program shows how to do this:
              :retry 3
              :wait-fn (fn [last-result current-wait-secs n-try]
 	                (if (:expected-downtime-secs last-result)
-                         (+ (:expected-downtime-secs last-result) 5)
-			  3))})
+			  (+ (:expected-downtime-secs last-result) 5)
+			   3))})
 ```
 
 Here the function passed to `:wait-fn` will be called to compute the duration between retries.
@@ -54,13 +56,60 @@ A simpler strategy of exponential back-off can be implemented as follows:
 ```clojure
 (r/executor {:handle [TimeoutException]
              :retry 3
-             :wait-fn (fn [_ wait-secs _]
-                        (if wait-secs
-                          (* wait-secs 2) ; exponential back-off
-                          1))})
+	     :wait-fn (fn [_ wait-secs _]
+	                (if wait-secs
+			  (* wait-secs 2) ; exponential back-off
+			   1))})
 ```
 
 ### Circuit breaker
+
+A network service may begin to fail because it's overloaded with requests. It may stabilize if new connections are limited.
+A Circuit breaker is an abstraction which can keep track of such failures, control new requests from going out to the remote service
+and give it an opportunity to heal.
+
+Going back to the earlier example of connecting to a database, we can wrap the calls to the `connect-to-db` function in a circuit
+breaker as shown below:
+
+```clojure
+(use '[recoil.circuit-breaker :as cb])
+
+(let [exec (cb/executor {:handle [TimeoutException]
+                         :wait-secs 5
+                         :window-size 3})
+      result (exec connect-to-db)]
+  (cond
+    (:ok result) :connected
+    (= (:error result) :circuit-breaker-open) :retry-later
+    :else :some-other-error))
+```
+
+The policy for the circuit breaker means to open the circuit breaker if it encounters 5 consecutive `TimeoutException`s.
+Once the circuit breaker is open, no more operations are allowed through it until it is closed again. During that time,
+the executor will return `{:error :circuit-breaker-open}`. Once open, the circuit breaker will remain in that state for
+the duration of `:wait-secs`. After that, it changes to a half-open state, where a limited number of operations will be allowed.
+If those succeed by returns an `{ok ...}` result, the circuit breaker will go to the normal closed state. Otherwise, it will
+go back to the `open` state and repeat the cycle.
+
+As a single circuit breaker will be shared between multiple operations on a single resource, it may become a performance bottleneck.
+To avoid this, the recoil implementation has avoided the use of long-held global locks. This means, the circuit breaker only guarantees
+that eventually `open`. In other words, a few calls may go through the circuit breaker even after the state machine has decided to
+move to the `open` state.
+
+A circuit breaker can be configured with a "logger" function. This is useful for capturing the state changes that a circuit breaker will
+go through for later debugging purposes.
+
+```clojure
+(defn cb-logger [cb-info]
+ (log/debug (str "circuit breaker " (:name cb-info) " changed to state: " (:state cb-info))))
+
+(cb/executor {:handle [TimeoutException]
+              :wait-secs 5
+              :window-size 3
+	      :logger cb-logger})
+```
+
+
 
 ### Timeouts
 
