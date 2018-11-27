@@ -19,8 +19,12 @@ is retried after a few seconds. So `connect-to-db` can be called under a retry p
 
 (let [exec (r/executor {:handle [TimeoutException]
                         :retry 3
-                        :wait-secs 5})]
-  (exec (connect-to-db)))
+                        :wait-secs 5})
+      result (exec (connect-to-db))]
+  (cond
+   (:ok result) (:ok result)
+   (= :handled-exception (:error result)) (log/info (str "expected error " (:exception result)))
+   :else (log/error (str "unexpected error " (:exception result)))))
 ```
 
 `recoil.retry/executor` returns a function that can retry an operation under the specified policies. In this example,
